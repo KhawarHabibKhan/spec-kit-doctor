@@ -12,7 +12,12 @@ for arg in "$@"; do
     esac
 done
 
-PROJECT_ROOT="$(pwd)"
+# Keep human diagnostics on stderr when stdout is requested as JSON.
+if [ "$JSON_MODE" = true ]; then
+    exec 3>&1
+    exec 1>&2
+fi
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ERRORS=()
 WARNINGS=()
 NOTES=()
@@ -58,10 +63,10 @@ echo ""
 echo "=== Project Structure ==="
 check_dir ".specify" ".specify/ directory" "error"
 check_dir "specs" "specs/ directory" "info"
-check_dir "scripts" "scripts/ directory" "error"
-check_dir "templates" "templates/ directory" "error"
-check_dir "memory" "memory/ directory" "error"
-check_file "memory/constitution.md" "memory/constitution.md" "warning"
+check_dir ".specify/scripts" ".specify/scripts/ directory" "error"
+check_dir ".specify/templates" ".specify/templates/ directory" "error"
+check_dir ".specify/memory" ".specify/memory/ directory" "error"
+check_file ".specify/memory/constitution.md" ".specify/memory/constitution.md" "warning"
 
 # ── 2. AI agent detection ─────────────────────────────────────────
 echo ""
@@ -94,6 +99,15 @@ declare -A AGENTS=(
 
 for path in "${!AGENTS[@]}"; do
     agent_name="${AGENTS[$path]}"
+    # Codex skills mode uses .agents/skills, not .codex/prompts.
+    if [ "$path" = ".agents/commands" ] && [ -d "$PROJECT_ROOT/.agents/skills/speckit-specify" ]; then
+        continue
+    fi
+    if [ "$path" = ".codex/prompts" ] && [ -f "$PROJECT_ROOT/.agents/skills/speckit-specify/SKILL.md" ]; then
+        AGENT_FOUND=true
+        echo "  [OK] Codex CLI (skills in .agents/skills/)"
+        continue
+    fi
     dir_part="$(dirname "$path")"
     if [ -d "$PROJECT_ROOT/$dir_part" ]; then
         AGENT_FOUND=true
@@ -154,11 +168,14 @@ fi
 echo ""
 echo "=== Scripts ==="
 
-EXPECTED_SCRIPTS="common check-prerequisites create-new-feature setup-plan update-agent-context"
+EXPECTED_SCRIPTS="common check-prerequisites create-new-feature setup-plan"
+if [ -f "$PROJECT_ROOT/.specify/scripts/bash/setup-tasks.sh" ]; then
+    EXPECTED_SCRIPTS="$EXPECTED_SCRIPTS setup-tasks resolve-template"
+fi
 
-if [ -d "$PROJECT_ROOT/scripts/bash" ]; then
+if [ -d "$PROJECT_ROOT/.specify/scripts/bash" ]; then
     for name in $EXPECTED_SCRIPTS; do
-        script="$PROJECT_ROOT/scripts/bash/${name}.sh"
+        script="$PROJECT_ROOT/.specify/scripts/bash/${name}.sh"
         if [ -f "$script" ]; then
             if [ ! -x "$script" ]; then
                 echo "  [WARNING] bash/${name}.sh — not executable"
@@ -175,9 +192,9 @@ else
     echo "  [NOTE] scripts/bash/ not found"
 fi
 
-if [ -d "$PROJECT_ROOT/scripts/powershell" ]; then
+if [ -d "$PROJECT_ROOT/.specify/scripts/powershell" ]; then
     for name in $EXPECTED_SCRIPTS; do
-        script="$PROJECT_ROOT/scripts/powershell/${name}.ps1"
+        script="$PROJECT_ROOT/.specify/scripts/powershell/${name}.ps1"
         if [ -f "$script" ]; then
             echo "  [OK] powershell/${name}.ps1"
         else
@@ -199,7 +216,7 @@ else
     echo "  [NOTE] No extensions configured"
 fi
 
-if [ -f "$PROJECT_ROOT/.specify/extensions/registry.json" ]; then
+if [ -f "$PROJECT_ROOT/.specify/extensions/.registry" ]; then
     echo "  [OK] Extension registry found"
 else
     echo "  [NOTE] No extensions installed"
@@ -260,6 +277,7 @@ echo ""
 
 # JSON output
 if [ "$JSON_MODE" = true ]; then
+    exec 1>&3
     echo "{"
     echo "  \"errors\": ${#ERRORS[@]},"
     echo "  \"warnings\": ${#WARNINGS[@]},"
