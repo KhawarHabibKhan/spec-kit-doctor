@@ -1,3 +1,13 @@
+## Unreleased compatibility follow-up
+
+- Validate Spec Kit1.2.2 native project selection, persisted feature pointers,
+  environment overrides, integration state and numbered feature paths.
+- Return JSON diagnostics for malformed metadata; reject unsafe feature paths.
+- Preserve script-family health checks and task bookkeeping without acceptance claims.
+- Keep Bash and PowerShell on a shared Python engine, with Python3.9+ required.
+- Retain existing PR regression coverage and add native state/no-write fixtures.
+- Document maintained fork installation and inherited license metadata limitations.
+
 # Changelog
 
 ## Unreleased

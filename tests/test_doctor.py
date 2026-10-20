@@ -80,7 +80,7 @@ class DoctorTests(unittest.TestCase):
 
     def test_json_escapes_names_and_contains_no_human_prefix(self):
         self.layout()
-        self.write('specs/a "quoted" feature/spec.md')
+        self.write('specs/003-a "quoted" feature/spec.md')
         value = json.loads(self.run_doctor('--json').stdout)
         self.assertTrue(any('a "quoted" feature' in finding['message'] for finding in value['findings']))
 

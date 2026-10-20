@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import re
+from project_state import project_root, native_state, resolve_feature
 
 SCRIPT_NAMES = ('common', 'check-prerequisites', 'create-new-feature', 'setup-plan')
 OPTIONAL_SCRIPT_NAMES = ('setup-tasks', 'resolve-template', 'update-agent-context')
@@ -50,6 +52,8 @@ AGENTS = {
 
 def diagnose(root):
     findings = []
+    state, selector = native_state(root)
+    active = resolve_feature(root, selector)
 
     def add(section, severity, message):
         findings.append({'section': section, 'severity': severity, 'message': message})
@@ -85,10 +89,13 @@ def diagnose(root):
         add('agents', 'note', 'No supported AI agent command directory detected')
 
     if (root / 'specs').is_dir():
-        features = sorted(path for path in (root / 'specs').iterdir() if path.is_dir() and not path.name.startswith('.'))
+        features = sorted(path for path in (root / 'specs').iterdir() if path.is_dir() and re.match(r'^[0-9]{3}-', path.name))
         if not features:
             add('features', 'note', 'No feature directories; create a specification when ready')
         for feature in features:
+            if feature.is_symlink():
+                add('features', 'error', 'Unsafe feature ' + feature.name)
+                continue
             if not (feature / 'spec.md').is_file():
                 add('features', 'error', 'Feature ' + repr(feature.name) + ' is missing spec.md')
             else:
@@ -178,7 +185,7 @@ def diagnose(root):
                 add('git', 'ok' if branch.returncode == 0 else 'note', 'Current branch: ' + branch.stdout.strip() if branch.returncode == 0 else 'Detached Git HEAD')
         except (OSError, subprocess.TimeoutExpired):
             add('git', 'warning', 'Git diagnostics could not complete within the read-only timeout')
-    return {'errors': sum(item['severity'] == 'error' for item in findings), 'warnings': sum(item['severity'] == 'warning' for item in findings), 'notes': sum(item['severity'] == 'note' for item in findings), 'findings': findings}
+    return {'active_feature': active.name if active else None, 'integration': state.get('integration') if state else None, 'acceptance': 'NOT_ASSESSED', 'errors': sum(item['severity'] == 'error' for item in findings), 'warnings': sum(item['severity'] == 'warning' for item in findings), 'notes': sum(item['severity'] == 'note' for item in findings), 'findings': findings}
 
 
 def main():
@@ -186,9 +193,9 @@ def main():
     parser.add_argument('--json', action='store_true', help='emit exactly one JSON object, without human output')
     arguments = parser.parse_args()
     try:
-        result = diagnose(Path.cwd())
-    except (OSError, ValueError):
-        result = {'errors': 1, 'warnings': 0, 'notes': 0, 'findings': [{'section': 'diagnostic', 'severity': 'error', 'message': 'Project scan could not read a required path'}]}
+        result = diagnose(project_root())
+    except (OSError, UnicodeError, ValueError) as exc:
+        result = {'errors': 1, 'warnings': 0, 'notes': 0, 'findings': [{'section': 'diagnostic', 'severity': 'error', 'message': str(exc)}]}
     if arguments.json:
         print(json.dumps(result, ensure_ascii=True, indent=2))
     else:

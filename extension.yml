@@ -3,12 +3,12 @@ schema_version: "1.0"
 extension:
   id: "doctor"
   name: "Project Health Check"
-  version: "1.0.0"
+  version: "1.0.1"
   description: "Diagnose a Spec Kit project and report health issues across structure, agents, features, scripts, extensions, and git."
   author: "KhawarHabibKhan"
-  repository: "https://github.com/KhawarHabibKhan/spec-kit-doctor"
+  repository: "https://github.com/3pepe3/spec-kit-doctor"
   license: "MIT"
-  homepage: "https://github.com/KhawarHabibKhan/spec-kit-doctor"
+  homepage: "https://github.com/3pepe3/spec-kit-doctor"
 
 requires:
   speckit_version: ">=0.1.0"
